@@ -62,7 +62,6 @@
 #include "gso.h"
 #include "vport-internal_dev.h"
 #include "vport-netdev.h"
-
 unsigned int ovs_net_id __read_mostly;
 
 static struct genl_family dp_packet_genl_family;
@@ -229,7 +228,6 @@ void ovs_dp_detach_port(struct vport *p)
 	/* Then destroy it. */
 	ovs_vport_del(p);
 }
-
 /* Must be called with rcu_read_lock. */
 void ovs_dp_process_packet(struct sk_buff *skb, struct sw_flow_key *key)
 {
@@ -247,6 +245,25 @@ void ovs_dp_process_packet(struct sk_buff *skb, struct sw_flow_key *key)
 	/* Look up flow. */
 	flow = ovs_flow_tbl_lookup_stats(&dp->table, key, skb_get_hash(skb),
 					 &n_mask_hit);
+
+	/************************dpi-enabled-ovs *******************************
+	 * Before proceeding to validate flow for upcall,
+	 * let us duplicate the packet and enqueue this packet for DPI in userspace for DPI
+	 * processing
+	 */
+
+	
+	{
+		struct dp_upcall_info upcall;
+
+		memset(&upcall, 0, sizeof(upcall));
+		upcall.cmd = OVS_PACKET_CMD_DPI;
+		upcall.portid = ovs_vport_find_upcall_portid(p, skb);
+		upcall.mru = OVS_CB(skb)->mru;
+		error = ovs_dp_upcall(dp, skb, key, &upcall, 0);
+		//actually we are not worrying about error here.
+		//Just logging for future purpose
+	}
 	if (unlikely(!flow)) {
 		struct dp_upcall_info upcall;
 
@@ -278,6 +295,8 @@ out:
 	(*stats_counter)++;
 	stats->n_mask_hit += n_mask_hit;
 	u64_stats_update_end(&stats->syncp);
+
+
 }
 
 int ovs_dp_upcall(struct datapath *dp, struct sk_buff *skb,

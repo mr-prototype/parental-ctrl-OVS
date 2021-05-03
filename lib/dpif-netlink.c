@@ -2553,6 +2553,12 @@ parse_odp_packet(struct ofpbuf *buf, struct dpif_upcall *upcall,
     int type = (genl->cmd == OVS_PACKET_CMD_MISS ? DPIF_UC_MISS
                 : genl->cmd == OVS_PACKET_CMD_ACTION ? DPIF_UC_ACTION
                 : -1);
+
+    if(genl->cmd == OVS_PACKET_CMD_DPI)
+    {
+    	type = DPIF_UC_DPI;
+    }
+
     if (type < 0) {
         return EINVAL;
     }

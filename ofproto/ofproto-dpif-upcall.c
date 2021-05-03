@@ -44,7 +44,7 @@
 #include "unixctl.h"
 #include "openvswitch/vlog.h"
 #include "lib/netdev-provider.h"
-
+#include "dpi/dpi-interface.h"
 #define UPCALL_MAX_BATCH 64
 #define REVALIDATE_MAX_BATCH 50
 
@@ -194,7 +194,8 @@ enum upcall_type {
     SFLOW_UPCALL,               /* sFlow sample. */
     FLOW_SAMPLE_UPCALL,         /* Per-flow sampling. */
     IPFIX_UPCALL,               /* Per-bridge sampling. */
-    CONTROLLER_UPCALL           /* Destined for the controller. */
+    CONTROLLER_UPCALL,           /* Destined for the controller. */
+    DPI_UPCALL
 };
 
 enum reval_result {
@@ -1012,8 +1013,12 @@ classify_upcall(enum dpif_upcall_type type, const struct nlattr *userdata,
 
     case DPIF_UC_MISS:
         return MISS_UPCALL;
+    
+    case DPIF_UC_DPI:
+	return DPI_UPCALL;
 
     case DPIF_N_UC_TYPES:
+	
     default:
         VLOG_WARN_RL(&rl, "upcall has unexpected type %"PRIu32, type);
         return BAD_UPCALL;
@@ -1114,7 +1119,13 @@ upcall_receive(struct upcall *upcall, const struct dpif_backer *backer,
         if (error) {
             return error;
         }
-    } else {
+    }else if(upcall->type == DPI_UPCALL){
+
+     upcall->type = DPI_UPCALL;
+}
+
+
+ else {
         struct ofproto_dpif *ofproto
             = ofproto_dpif_lookup_by_uuid(&upcall->cookie.ofproto_uuid);
         if (!ofproto) {
@@ -1393,6 +1404,7 @@ dpif_read_actions(struct udpif *udpif, struct upcall *upcall,
     case MISS_UPCALL:
     case SLOW_PATH_UPCALL:
     case CONTROLLER_UPCALL:
+    case DPI_UPCALL:
     default:
         break;
     }
@@ -1546,7 +1558,14 @@ process_upcall(struct udpif *udpif, struct upcall *upcall,
             ofproto_dpif_send_async_msg(upcall->ofproto, am);
         }
         break;
-
+	
+    case DPI_UPCALL:
+        {
+        	VLOG_INFO(" packet arrived for DPI :-) ");
+        	dpiProcessPacket(dp_packet_data(packet), dp_packet_size(packet));
+        	VLOG_INFO(" DPI done successfully :-) ");
+		break;
+        }
     case BAD_UPCALL:
         break;
     }
@@ -1577,6 +1596,8 @@ handle_upcalls(struct udpif *udpif, struct upcall *upcalls,
         struct upcall *upcall = &upcalls[i];
         const struct dp_packet *packet = upcall->packet;
         struct ukey_op *op;
+
+
 
         if (should_install_flow(udpif, upcall)) {
             struct udpif_key *ukey = upcall->ukey;

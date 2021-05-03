@@ -9,7 +9,7 @@ lib_LTLIBRARIES += ofproto/libofproto.la
 ofproto_libofproto_la_LDFLAGS = \
         $(OVS_LTINFO) \
         -Wl,--version-script=$(top_builddir)/ofproto/libofproto.sym \
-        $(AM_LDFLAGS)
+        $(AM_LDFLAGS) -ldl
 ofproto_libofproto_la_SOURCES = \
 	ofproto/bond.c \
 	ofproto/bond.h \
@@ -38,6 +38,7 @@ ofproto_libofproto_la_SOURCES = \
 	ofproto/ofproto-dpif-rid.h \
 	ofproto/ofproto-dpif-sflow.c \
 	ofproto/ofproto-dpif-sflow.h \
+	ofproto/dpi/dpi_engine.c \
 	ofproto/ofproto-dpif-trace.c \
 	ofproto/ofproto-dpif-trace.h \
 	ofproto/ofproto-dpif-upcall.c \
